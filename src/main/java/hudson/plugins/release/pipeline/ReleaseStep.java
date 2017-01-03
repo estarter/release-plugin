@@ -1,6 +1,8 @@
 package hudson.plugins.release.pipeline;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -21,14 +23,24 @@ import com.google.inject.Inject;
 
 import hudson.AbortException;
 import hudson.Extension;
+import hudson.Launcher;
 import hudson.console.ModelHyperlinkNote;
+import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
 import hudson.model.Action;
+import hudson.model.BuildListener;
 import hudson.model.Cause;
 import hudson.model.CauseAction;
+import hudson.model.Environment;
 import hudson.model.Job;
+import hudson.model.ParameterDefinition;
+import hudson.model.ParameterValue;
+import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.model.queue.QueueTaskFuture;
+import hudson.plugins.release.ReleaseWrapper;
+import hudson.plugins.release.SafeParametersAction;
 import jenkins.YesNoMaybe;
 import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
@@ -56,8 +68,9 @@ public class ReleaseStep extends AbstractStepImpl {
     }
 
     public static class Execution extends AbstractSynchronousStepExecution {
-        @StepContextParameter private transient TaskListener listener;
         @StepContextParameter private transient Run<?,?> invokingRun;
+        @StepContextParameter private transient Launcher launcher;
+        @StepContextParameter private transient TaskListener listener;
 
         @Inject(optional=true) transient ReleaseStep step;
 
@@ -67,12 +80,39 @@ public class ReleaseStep extends AbstractStepImpl {
             if (step.getJob() == null) {
                 throw new AbortException("Job name is not defined.");
             }
-            final ParameterizedJobMixIn.ParameterizedJob project = Jenkins.getActiveInstance().getItem(step.getJob(), invokingRun.getParent(), ParameterizedJobMixIn.ParameterizedJob.class);
+
+            // hudson.maven.MavenModuleSet
+            final AbstractProject project = Jenkins.getActiveInstance().getItem(step.getJob(), invokingRun.getParent(), AbstractProject.class);
             if (project == null) {
                 throw new AbortException("No parametrized job named " + step.getJob() + " found");
             }
             listener.getLogger().println("Releasing project: " + ModelHyperlinkNote.encodeTo(project));
 
+            listener.getLogger().println("Project: " + project.getClass().getName());
+
+
+
+            ReleaseWrapper wrapper = new ReleaseWrapper();
+/*
+            Collection<? extends Action> projectActions = wrapper.getProjectActions(project);
+            Iterator<? extends Action> it = projectActions.iterator();
+            while (it.hasNext()) {
+                Action action = it.next();
+                listener.getLogger().println("action : " + action.getClass().getName());
+            }
+*/
+
+            // Environment env = wrapper.setUp((AbstractBuild) invokingRun.getNextBuild(), launcher, (BuildListener) listener);
+
+            List<ParameterValue> paramValues = getDefaultParametersValues(project);
+            project.scheduleBuild(0, new Cause.UserIdCause(),
+                    new ReleaseWrapper.ReleaseBuildBadgeAction(),
+                    new SafeParametersAction(paramValues));
+
+
+
+
+/*
             List<Action> actions = new ArrayList<Action>();
             actions.add(new CauseAction(new Cause.UpstreamCause(invokingRun)));
             QueueTaskFuture<?> f = new ParameterizedJobMixIn() {
@@ -83,8 +123,30 @@ public class ReleaseStep extends AbstractStepImpl {
             if (f == null) {
                 throw new AbortException("Failed to trigger build of " + project.getFullName());
             }
+*/
 
             return null;
+        }
+
+        private List<ParameterValue> getDefaultParametersValues(AbstractProject project) {
+            ParametersDefinitionProperty paramDefProp = (ParametersDefinitionProperty) project.getProperty(ParametersDefinitionProperty.class);
+            ArrayList<ParameterValue> defValues = new ArrayList<ParameterValue>();
+
+            /*
+             * This check is made ONLY if someone will call this method even if isParametrized() is false.
+             */
+            if(paramDefProp == null)
+                return defValues;
+
+            /* Scan for all parameter with an associated default values */
+            for(ParameterDefinition paramDefinition : paramDefProp.getParameterDefinitions()) {
+                ParameterValue defaultValue = paramDefinition.getDefaultParameterValue();
+
+                if(defaultValue != null)
+                    defValues.add(defaultValue);
+            }
+
+            return defValues;
         }
     }
 
@@ -101,7 +163,7 @@ public class ReleaseStep extends AbstractStepImpl {
 
         @Override
         public String getDisplayName() {
-            return "release";
+            return "Trigger release for the job";
         }
     }
 
