@@ -24,29 +24,23 @@
  */
 package hudson.plugins.release;
 
-import hudson.AbortException;
 import hudson.DescriptorExtensionList;
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.ExtensionList;
-import hudson.FilePath;
 import hudson.Functions;
 import hudson.Launcher;
 import hudson.Util;
-import hudson.console.ModelHyperlinkNote;
 import hudson.ivy.IvyModuleSet;
 import hudson.matrix.MatrixRun;
 import hudson.maven.MavenModuleSet;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
-import hudson.model.Build;
 import hudson.model.BuildBadgeAction;
 import hudson.model.BuildListener;
 import hudson.model.Cause;
-import hudson.model.CauseAction;
 import hudson.model.Descriptor;
-import hudson.model.Environment;
 import hudson.model.FreeStyleProject;
 import hudson.model.Hudson;
 import hudson.model.Item;
@@ -60,14 +54,11 @@ import hudson.model.PermalinkProjectAction.Permalink;
 import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.StringParameterValue;
-import hudson.model.TaskListener;
-import hudson.model.queue.QueueTaskFuture;
 import hudson.plugins.release.promotion.ReleasePromotionCondition;
 import hudson.security.Permission;
 import hudson.security.PermissionGroup;
 import hudson.security.PermissionScope;
 import hudson.tasks.BuildStep;
-import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.BuildWrapper;
 import hudson.tasks.BuildWrapperDescriptor;
 import hudson.tasks.Builder;
@@ -89,18 +80,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 
 import jenkins.model.Jenkins;
-import jenkins.model.ParameterizedJobMixIn;
-import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.ArrayUtils;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 
@@ -111,7 +97,7 @@ import org.kohsuke.stapler.StaplerResponse;
  * @author Peter Hayes
  * @since 1.0
  */
-public class ReleaseWrapper extends BuildWrapper implements MatrixAggregatable, SimpleBuildStep {
+public class ReleaseWrapper extends BuildWrapper implements MatrixAggregatable {
 
     public static final PermissionGroup PERMISSIONS = new PermissionGroup(ReleaseWrapper.class, Messages._ReleaseWrapper_PermissionsTitle());
 
@@ -179,7 +165,6 @@ public class ReleaseWrapper extends BuildWrapper implements MatrixAggregatable, 
         });
     }
 
-    @DataBoundConstructor
     public ReleaseWrapper() {
     }
        
@@ -441,81 +426,8 @@ public class ReleaseWrapper extends BuildWrapper implements MatrixAggregatable, 
 	public static void checkReleasePermission(AbstractProject job) {
 		job.checkPermission(RELEASE_PERMISSION);
 	}
-
-	private String job;
-
-    public String getJob() {
-        return job;
-    }
-
-    @DataBoundSetter public void setJob(String job) {
-        this.job = job;
-    }
-
-    @Override
-    public void perform(@Nonnull Run<?, ?> build, @Nonnull FilePath workspace, @Nonnull Launcher launcher, @Nonnull TaskListener listener) throws InterruptedException, IOException {
-        // Jenkins jenkins = Jenkins.getInstance();
-        // if (jenkins == null) {
-        //     throw new AbortException("Jenkins instance is unavailable.");
-        // }
-        if (getJob() == null) {
-            throw new AbortException("Job name is not defined.");
-        }
-        final ParameterizedJobMixIn.ParameterizedJob project = Jenkins.getActiveInstance().getItem(getJob(), build.getParent(), ParameterizedJobMixIn.ParameterizedJob.class);
-        if (project == null) {
-            throw new AbortException("No parametrized job named " + getJob() + " found");
-        }
-        listener.getLogger().println("Releasing project: " + ModelHyperlinkNote.encodeTo(project));
-
-
-
-
-
-
-        List<Action> actions = new ArrayList<Action>();
-        actions.add(new CauseAction(new Cause.UpstreamCause(build)));
-        QueueTaskFuture<?> f = new ParameterizedJobMixIn() {
-            @Override protected Job asJob() {
-                return (Job) project;
-            }
-        }.scheduleBuild2(0, actions.toArray(new Action[]{}));
-        if (f == null) {
-            throw new AbortException("Failed to trigger build of " + project.getFullName());
-        }
-
-
-
-
-        // build.getbuild
-        // hudson.model.Environment env = setUp((AbstractBuild) build, launcher, (BuildListener) listener);
-        // env.tearDown((AbstractBuild) build, (BuildListener) listener);
-        // getProjectActions(build);
-
-    }
-
-    @Override
-    public boolean prebuild(AbstractBuild<?, ?> abstractBuild, BuildListener buildListener) {
-        return true;
-    }
-
-    @Override
-    public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener)
-            throws InterruptedException, IOException {
-        FilePath workspace = build.getWorkspace();
-        if(workspace == null) {
-            throw new AbortException("no workspace for " + build);
-        } else {
-            perform(build, workspace, launcher, listener);
-            return true;
-        }
-    }
-
-    @Override
-    public BuildStepMonitor getRequiredMonitorService() {
-        return BuildStepMonitor.NONE;
-    }
-
-    @Extension
+    
+	@Extension
     public static final class DescriptorImpl extends BuildWrapperDescriptor {
         
         @Override
