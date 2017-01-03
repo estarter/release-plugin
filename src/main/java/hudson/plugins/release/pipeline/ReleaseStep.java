@@ -67,15 +67,36 @@ public class ReleaseStep extends AbstractStepImpl {
         this.job = job;
     }
 
-    public static class Execution extends AbstractSynchronousStepExecution {
+    public static class Execution extends AbstractStepExecutionImpl {
         @StepContextParameter private transient Run<?,?> invokingRun;
         @StepContextParameter private transient Launcher launcher;
         @StepContextParameter private transient TaskListener listener;
 
         @Inject(optional=true) transient ReleaseStep step;
 
+        private List<ParameterValue> getDefaultParametersValues(AbstractProject project) {
+            ParametersDefinitionProperty paramDefProp = (ParametersDefinitionProperty) project.getProperty(ParametersDefinitionProperty.class);
+            ArrayList<ParameterValue> defValues = new ArrayList<ParameterValue>();
+
+            /*
+             * This check is made ONLY if someone will call this method even if isParametrized() is false.
+             */
+            if(paramDefProp == null)
+                return defValues;
+
+            /* Scan for all parameter with an associated default values */
+            for(ParameterDefinition paramDefinition : paramDefProp.getParameterDefinitions()) {
+                ParameterValue defaultValue = paramDefinition.getDefaultParameterValue();
+
+                if(defaultValue != null)
+                    defValues.add(defaultValue);
+            }
+
+            return defValues;
+        }
+
         @Override
-        protected Void run() throws Exception {
+        public boolean start() throws Exception {
             // StepContext context = getContext();
             if (step.getJob() == null) {
                 throw new AbortException("Job name is not defined.");
@@ -125,29 +146,15 @@ public class ReleaseStep extends AbstractStepImpl {
             }
 */
 
-            return null;
+            return false;
         }
 
-        private List<ParameterValue> getDefaultParametersValues(AbstractProject project) {
-            ParametersDefinitionProperty paramDefProp = (ParametersDefinitionProperty) project.getProperty(ParametersDefinitionProperty.class);
-            ArrayList<ParameterValue> defValues = new ArrayList<ParameterValue>();
-
-            /*
-             * This check is made ONLY if someone will call this method even if isParametrized() is false.
-             */
-            if(paramDefProp == null)
-                return defValues;
-
-            /* Scan for all parameter with an associated default values */
-            for(ParameterDefinition paramDefinition : paramDefProp.getParameterDefinitions()) {
-                ParameterValue defaultValue = paramDefinition.getDefaultParameterValue();
-
-                if(defaultValue != null)
-                    defValues.add(defaultValue);
-            }
-
-            return defValues;
+        @Override
+        public void stop(@Nonnull Throwable cause) throws Exception {
+            getContext().onFailure(cause);
         }
+
+        private static final long serialVersionUID = 1L;
     }
 
     @Extension(dynamicLoadable = YesNoMaybe.YES, optional = true)
@@ -166,5 +173,6 @@ public class ReleaseStep extends AbstractStepImpl {
             return "Trigger release for the job";
         }
     }
+
 
 }
