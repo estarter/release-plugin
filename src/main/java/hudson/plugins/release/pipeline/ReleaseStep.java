@@ -20,8 +20,12 @@ import org.jenkinsci.plugins.workflow.steps.StepContextParameter;
 import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 import org.jenkinsci.plugins.workflow.steps.StepExecution;
 import org.jenkinsci.plugins.workflow.util.StaplerReferer;
+import org.kohsuke.accmod.Restricted;
+import org.kohsuke.accmod.restrictions.DoNotUse;
+import org.kohsuke.stapler.AncestorInPath;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
 import com.google.inject.Inject;
@@ -33,10 +37,12 @@ import hudson.console.ModelHyperlinkNote;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
+import hudson.model.AutoCompletionCandidates;
 import hudson.model.BuildListener;
 import hudson.model.Cause;
 import hudson.model.CauseAction;
 import hudson.model.Environment;
+import hudson.model.ItemGroup;
 import hudson.model.Job;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
@@ -63,6 +69,7 @@ public class ReleaseStep extends AbstractStepImpl {
     private static final Logger LOGGER = Logger.getLogger(ReleaseStep.class.getName());
 
     private String job;
+    private List<ParameterValue> parameters;
 
     @DataBoundConstructor
     public ReleaseStep(String job) {
@@ -81,6 +88,10 @@ public class ReleaseStep extends AbstractStepImpl {
         List<ParameterValue> parameters = new ArrayList<>();
         parameters.add(new StringParameterValue("releaseVersion", "123"));
         return parameters;
+    }
+
+    @DataBoundSetter public void setParameters(List<ParameterValue> parameters) {
+        this.parameters = parameters;
     }
 
     public static class Execution extends AbstractStepExecutionImpl {
@@ -147,7 +158,7 @@ public class ReleaseStep extends AbstractStepImpl {
         private static final long serialVersionUID = 1L;
     }
 
-    @Extension(dynamicLoadable = YesNoMaybe.YES, optional = true)
+    @Extension
     public static class DescriptorImpl extends AbstractStepDescriptorImpl {
         public DescriptorImpl() {
             super(Execution.class);
@@ -162,7 +173,49 @@ public class ReleaseStep extends AbstractStepImpl {
         public String getDisplayName() {
             return "Trigger release for the job";
         }
+
+        @Override public Step newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+            ReleaseStep step = (ReleaseStep) super.newInstance(req, formData);
+            // Cf. ParametersDefinitionProperty._doBuild:
+            Object parameter = formData.get("parameter");
+            JSONArray params = parameter != null ? JSONArray.fromObject(parameter) : null;
+            if (params != null) {
+                Jenkins jenkins = Jenkins.getInstance();
+                Job<?,?> context = StaplerReferer.findItemFromRequest(Job.class);
+                Job<?,?> job = jenkins != null ? jenkins.getItem(step.getJob(), context, Job.class) : null;
+                if (job != null) {
+                    ParametersDefinitionProperty pdp = job.getProperty(ParametersDefinitionProperty.class);
+                    if (pdp != null) {
+                        List<ParameterValue> values = new ArrayList<ParameterValue>();
+                        for (Object o : params) {
+                            JSONObject jo = (JSONObject) o;
+                            String name = jo.getString("name");
+                            ParameterDefinition d = pdp.getParameterDefinition(name);
+                            if (d == null) {
+                                throw new IllegalArgumentException("No such parameter definition: " + name);
+                            }
+                            ParameterValue parameterValue = d.createValue(req, jo);
+                            if (parameterValue != null) {
+                                values.add(parameterValue);
+                            } else {
+                                throw new IllegalArgumentException("Cannot retrieve the parameter value: " + name);
+                            }
+                        }
+                        step.setParameters(values);
+                    }
+                }
+            }
+            return step;
+        }
+
+        public AutoCompletionCandidates doAutoCompleteJob(@AncestorInPath ItemGroup<?> context, @QueryParameter String value) {
+            return AutoCompletionCandidates.ofJobNames(ParameterizedJobMixIn.ParameterizedJob.class, value, context);
+        }
+
+        @Restricted(DoNotUse.class) // for use from config.jelly
+        public String getContext() {
+            Job<?,?> job = StaplerReferer.findItemFromRequest(Job.class);
+            return job != null ? job.getFullName() : null;
+        }
     }
-
-
 }
