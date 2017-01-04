@@ -18,6 +18,9 @@ import javax.annotation.Nonnull;
 import org.jenkinsci.plugins.workflow.steps.StepContext;
 import org.jenkinsci.plugins.workflow.support.steps.build.RunWrapper;
 
+/**
+ * copied from org.jenkinsci.plugins.workflow.support.steps.build.BuildTriggerListener
+ */
 @Extension
 public class ReleaseTriggerListener extends RunListener<Run<?,?>>{
 

@@ -6,7 +6,7 @@ import hudson.model.Queue;
 import hudson.model.queue.QueueListener;
 
 /**
- * @author Vivek Pandey
+ * copied from org.jenkinsci.plugins.workflow.support.steps.build.BuildQueueListener
  */
 @Extension
 public class ReleaseQueueListener extends QueueListener {

@@ -15,6 +15,9 @@ import hudson.model.InvisibleAction;
 import hudson.model.Queue;
 import hudson.model.queue.FoldableAction;
 
+/**
+ * copied from org.jenkinsci.plugins.workflow.support.steps.build.BuildTriggerAction
+ */
 @SuppressWarnings("SynchronizeOnNonFinalField")
 class ReleaseTriggerAction extends InvisibleAction implements FoldableAction {
 
