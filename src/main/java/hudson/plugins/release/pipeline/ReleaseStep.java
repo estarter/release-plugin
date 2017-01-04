@@ -5,6 +5,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 
@@ -35,6 +37,7 @@ import hudson.model.Environment;
 import hudson.model.Job;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
+import hudson.model.ParametersAction;
 import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
 import hudson.model.TaskListener;
@@ -51,6 +54,7 @@ import jenkins.model.ParameterizedJobMixIn;
  * @author Alexey Merezhin
  */
 public class ReleaseStep extends AbstractStepImpl {
+    private static final Logger LOGGER = Logger.getLogger(ReleaseStep.class.getName());
 
     private String job;
 
@@ -125,13 +129,39 @@ public class ReleaseStep extends AbstractStepImpl {
 
             // Environment env = wrapper.setUp((AbstractBuild) invokingRun.getNextBuild(), launcher, (BuildListener) listener);
 
+            List<Action> actions = new ArrayList<>();
+
+            actions.add(new CauseAction(new Cause.UpstreamCause(invokingRun)));
+
+            StepContext context = getContext();
+            actions.add(new ReleaseTriggerAction(context));
+            LOGGER.log(Level.FINER, "scheduling a release of {0} from {1}", new Object[] {project, context});
+
+/*
+            List<ParameterValue> parameters = step.getParameters();
+            if (parameters != null) {
+                parameters = completeDefaultParameters(parameters, (Job) project);
+                actions.add(new ParametersAction(parameters));
+            }
+*/
+            actions.add(new SafeParametersAction(getDefaultParametersValues(project)));
+            actions.add(new ReleaseWrapper.ReleaseBuildBadgeAction());
+
+
+            QueueTaskFuture<?> f = new ParameterizedJobMixIn() {
+                @Override protected Job asJob() {
+                    return (Job) project;
+                }
+            }.scheduleBuild2(0, actions.toArray(new Action[]{}));
+            if (f == null) {
+                throw new AbortException("Failed to trigger build of " + project.getFullName());
+            }
+/*
             List<ParameterValue> paramValues = getDefaultParametersValues(project);
             project.scheduleBuild(0, new Cause.UserIdCause(),
                     new ReleaseWrapper.ReleaseBuildBadgeAction(),
                     new SafeParametersAction(paramValues));
-
-
-
+*/
 
 /*
             List<Action> actions = new ArrayList<Action>();
