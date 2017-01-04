@@ -31,11 +31,11 @@ public class ReleaseTriggerListener extends RunListener<Run<?,?>>{
         for (ReleaseTriggerAction.Trigger trigger : ReleaseTriggerAction.triggersFor(run)) {
             StepContext stepContext = trigger.context;
             if (stepContext != null && stepContext.isReady()) {
-                LOGGER.log(Level.FINE, "started building {0} from #{1} in {2}", new Object[] {run, run.getQueueId(), stepContext});
+                LOGGER.log(Level.FINE, "started releasing {0} from #{1} in {2}", new Object[] {run, run.getQueueId(), stepContext});
                 try {
                     TaskListener taskListener = stepContext.get(TaskListener.class);
                     // encodeTo(Run) calls getDisplayName, which does not include the project name.
-                    taskListener.getLogger().println("Starting building: " + ModelHyperlinkNote.encodeTo("/" + run.getUrl(), run.getFullDisplayName()));
+                    taskListener.getLogger().println("Starting releasing: " + ModelHyperlinkNote.encodeTo("/" + run.getUrl(), run.getFullDisplayName()));
                 } catch (Exception e) {
                     LOGGER.log(WARNING, null, e);
                 }
@@ -57,7 +57,7 @@ public class ReleaseTriggerListener extends RunListener<Run<?,?>>{
                     trigger.context.onFailure(trigger.interruption);
                 }
             } else {
-                trigger.context.onFailure(new AbortException(run.getFullDisplayName() + " completed with status " + run.getResult() + " (propagate: false to ignore)"));
+                trigger.context.onFailure(new AbortException(run.getFullDisplayName() + " completed with status " + run.getResult()));
             }
         }
         run.getActions().removeAll(run.getActions(ReleaseTriggerAction.class));

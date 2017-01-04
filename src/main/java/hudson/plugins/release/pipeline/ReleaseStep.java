@@ -1,10 +1,7 @@
 package hudson.plugins.release.pipeline;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -13,12 +10,9 @@ import javax.annotation.Nonnull;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepExecutionImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepImpl;
-import org.jenkinsci.plugins.workflow.steps.AbstractSynchronousStepExecution;
 import org.jenkinsci.plugins.workflow.steps.Step;
 import org.jenkinsci.plugins.workflow.steps.StepContext;
 import org.jenkinsci.plugins.workflow.steps.StepContextParameter;
-import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
-import org.jenkinsci.plugins.workflow.steps.StepExecution;
 import org.jenkinsci.plugins.workflow.util.StaplerReferer;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.DoNotUse;
@@ -34,27 +28,20 @@ import hudson.AbortException;
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.console.ModelHyperlinkNote;
-import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.AutoCompletionCandidates;
-import hudson.model.BuildListener;
+import hudson.model.BuildableItemWithBuildWrappers;
 import hudson.model.Cause;
-import hudson.model.CauseAction;
-import hudson.model.Environment;
 import hudson.model.ItemGroup;
 import hudson.model.Job;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
-import hudson.model.ParametersAction;
-import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
-import hudson.model.StringParameterValue;
 import hudson.model.TaskListener;
 import hudson.model.queue.QueueTaskFuture;
 import hudson.plugins.release.ReleaseWrapper;
 import hudson.plugins.release.SafeParametersAction;
-import jenkins.YesNoMaybe;
 import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
 import net.sf.json.JSONArray;
@@ -74,6 +61,7 @@ public class ReleaseStep extends AbstractStepImpl {
     @DataBoundConstructor
     public ReleaseStep(String job) {
         this.job = job;
+        parameters = new ArrayList<>();
     }
 
     public String getJob() {
@@ -85,8 +73,6 @@ public class ReleaseStep extends AbstractStepImpl {
     }
 
     public List<ParameterValue> getParameters() {
-        List<ParameterValue> parameters = new ArrayList<>();
-        parameters.add(new StringParameterValue("releaseVersion", "123"));
         return parameters;
     }
 
@@ -101,25 +87,28 @@ public class ReleaseStep extends AbstractStepImpl {
 
         @Inject(optional=true) transient ReleaseStep step;
 
-        private List<ParameterValue> getDefaultParametersValues(AbstractProject project) {
-            ParametersDefinitionProperty paramDefProp = (ParametersDefinitionProperty) project.getProperty(ParametersDefinitionProperty.class);
-            ArrayList<ParameterValue> defValues = new ArrayList<ParameterValue>();
+        private List<ParameterValue> updateParametersWithDefaults(AbstractProject project,
+                List<ParameterValue> parameters) {
 
-            /*
-             * This check is made ONLY if someone will call this method even if isParametrized() is false.
-             */
-            if(paramDefProp == null)
-                return defValues;
-
-            /* Scan for all parameter with an associated default values */
-            for(ParameterDefinition paramDefinition : paramDefProp.getParameterDefinitions()) {
-                ParameterValue defaultValue = paramDefinition.getDefaultParameterValue();
-
-                if(defaultValue != null)
-                    defValues.add(defaultValue);
+            if (project instanceof BuildableItemWithBuildWrappers) {
+                ReleaseWrapper wrapper = ((BuildableItemWithBuildWrappers) project).getBuildWrappersList()
+                                                                                   .get(ReleaseWrapper.class);
+                if (wrapper != null) {
+                    for (ParameterDefinition pd : wrapper.getParameterDefinitions()) {
+                        boolean parameterExists = false;
+                        for (ParameterValue pv : parameters) {
+                            if (pv.getName().equals(pd.getName())) {
+                                parameterExists = true;
+                                break;
+                            }
+                        }
+                        if (!parameterExists) {
+                            parameters.add(pd.getDefaultParameterValue());
+                        }
+                    }
+                }
             }
-
-            return defValues;
+            return parameters;
         }
 
         @Override
@@ -139,7 +128,7 @@ public class ReleaseStep extends AbstractStepImpl {
             StepContext context = getContext();
             actions.add(new ReleaseTriggerAction(context));
             LOGGER.log(Level.FINER, "scheduling a release of {0} from {1}", new Object[] { project, context });
-            actions.add(new SafeParametersAction(step.getParameters()));
+            actions.add(new SafeParametersAction(updateParametersWithDefaults(project, step.getParameters())));
             actions.add(new ReleaseWrapper.ReleaseBuildBadgeAction());
 
             QueueTaskFuture<?> task = project.scheduleBuild2(0, new Cause.UpstreamCause(invokingRun), actions);
@@ -183,26 +172,33 @@ public class ReleaseStep extends AbstractStepImpl {
                 Jenkins jenkins = Jenkins.getInstance();
                 Job<?,?> context = StaplerReferer.findItemFromRequest(Job.class);
                 Job<?,?> job = jenkins != null ? jenkins.getItem(step.getJob(), context, Job.class) : null;
-                if (job != null) {
-                    ParametersDefinitionProperty pdp = job.getProperty(ParametersDefinitionProperty.class);
-                    if (pdp != null) {
-                        List<ParameterValue> values = new ArrayList<ParameterValue>();
+
+                AbstractProject project = Jenkins.getActiveInstance()
+                                                       .getItem(step.getJob(), context, AbstractProject.class);
+
+                if (project instanceof BuildableItemWithBuildWrappers) {
+                    ReleaseWrapper wrapper = ((BuildableItemWithBuildWrappers) project).getBuildWrappersList()
+                                                                       .get(ReleaseWrapper.class);
+                    if (wrapper == null) {
+                        throw new IllegalArgumentException("Job doesn't have release plugin configuration");
+                    }
+                    List<ParameterDefinition> parameterDefinitions = wrapper.getParameterDefinitions();
+                    if (parameterDefinitions != null) {
+                        List<ParameterValue> values = new ArrayList<>();
                         for (Object o : params) {
                             JSONObject jo = (JSONObject) o;
                             String name = jo.getString("name");
-                            ParameterDefinition d = pdp.getParameterDefinition(name);
-                            if (d == null) {
-                                throw new IllegalArgumentException("No such parameter definition: " + name);
-                            }
-                            ParameterValue parameterValue = d.createValue(req, jo);
-                            if (parameterValue != null) {
-                                values.add(parameterValue);
-                            } else {
-                                throw new IllegalArgumentException("Cannot retrieve the parameter value: " + name);
+                            for (ParameterDefinition pd : parameterDefinitions) {
+                                if (name.equals(pd.getName())) {
+                                    ParameterValue parameterValue = pd.createValue(req, jo);
+                                    values.add(parameterValue);
+                                }
                             }
                         }
                         step.setParameters(values);
                     }
+                } else {
+                    throw new IllegalArgumentException("Wrong job type: " + project.getClass().getName());
                 }
             }
             return step;
