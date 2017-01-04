@@ -101,37 +101,18 @@ public class ReleaseStep extends AbstractStepImpl {
 
         @Override
         public boolean start() throws Exception {
-            // StepContext context = getContext();
             if (step.getJob() == null) {
                 throw new AbortException("Job name is not defined.");
             }
 
-            // hudson.maven.MavenModuleSet
             final AbstractProject project = Jenkins.getActiveInstance().getItem(step.getJob(), invokingRun.getParent(), AbstractProject.class);
             if (project == null) {
                 throw new AbortException("No parametrized job named " + step.getJob() + " found");
             }
             listener.getLogger().println("Releasing project: " + ModelHyperlinkNote.encodeTo(project));
 
-            listener.getLogger().println("Project: " + project.getClass().getName());
-
-
-
-            ReleaseWrapper wrapper = new ReleaseWrapper();
-/*
-            Collection<? extends Action> projectActions = wrapper.getProjectActions(project);
-            Iterator<? extends Action> it = projectActions.iterator();
-            while (it.hasNext()) {
-                Action action = it.next();
-                listener.getLogger().println("action : " + action.getClass().getName());
-            }
-*/
-
-            // Environment env = wrapper.setUp((AbstractBuild) invokingRun.getNextBuild(), launcher, (BuildListener) listener);
 
             List<Action> actions = new ArrayList<>();
-
-            actions.add(new CauseAction(new Cause.UpstreamCause(invokingRun)));
 
             StepContext context = getContext();
             actions.add(new ReleaseTriggerAction(context));
@@ -145,36 +126,14 @@ public class ReleaseStep extends AbstractStepImpl {
             }
 */
             actions.add(new SafeParametersAction(getDefaultParametersValues(project)));
+
             actions.add(new ReleaseWrapper.ReleaseBuildBadgeAction());
 
 
-            QueueTaskFuture<?> f = new ParameterizedJobMixIn() {
-                @Override protected Job asJob() {
-                    return (Job) project;
-                }
-            }.scheduleBuild2(0, actions.toArray(new Action[]{}));
-            if (f == null) {
+            QueueTaskFuture<?> task = project.scheduleBuild2(0, new Cause.UpstreamCause(invokingRun), actions);
+            if (task == null) {
                 throw new AbortException("Failed to trigger build of " + project.getFullName());
             }
-/*
-            List<ParameterValue> paramValues = getDefaultParametersValues(project);
-            project.scheduleBuild(0, new Cause.UserIdCause(),
-                    new ReleaseWrapper.ReleaseBuildBadgeAction(),
-                    new SafeParametersAction(paramValues));
-*/
-
-/*
-            List<Action> actions = new ArrayList<Action>();
-            actions.add(new CauseAction(new Cause.UpstreamCause(invokingRun)));
-            QueueTaskFuture<?> f = new ParameterizedJobMixIn() {
-                @Override protected Job asJob() {
-                    return (Job) project;
-                }
-            }.scheduleBuild2(0, actions.toArray(new Action[]{}));
-            if (f == null) {
-                throw new AbortException("Failed to trigger build of " + project.getFullName());
-            }
-*/
 
             return false;
         }
