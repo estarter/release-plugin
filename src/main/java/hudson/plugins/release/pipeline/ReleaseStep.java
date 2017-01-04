@@ -26,7 +26,6 @@ import com.google.inject.Inject;
 
 import hudson.AbortException;
 import hudson.Extension;
-import hudson.Launcher;
 import hudson.console.ModelHyperlinkNote;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
@@ -82,7 +81,6 @@ public class ReleaseStep extends AbstractStepImpl {
 
     public static class Execution extends AbstractStepExecutionImpl {
         @StepContextParameter private transient Run<?,?> invokingRun;
-        @StepContextParameter private transient Launcher launcher;
         @StepContextParameter private transient TaskListener listener;
 
         @Inject(optional=true) transient ReleaseStep step;
