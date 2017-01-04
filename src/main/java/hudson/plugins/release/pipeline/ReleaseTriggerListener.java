@@ -25,8 +25,6 @@ public class ReleaseTriggerListener extends RunListener<Run<?,?>>{
 
     @Override
     public void onStarted(Run<?, ?> run, TaskListener listener) {
-        LOGGER.log(Level.INFO, "onStarted");
-
         for (ReleaseTriggerAction.Trigger trigger : ReleaseTriggerAction.triggersFor(run)) {
             StepContext stepContext = trigger.context;
             if (stepContext != null && stepContext.isReady()) {
@@ -47,8 +45,6 @@ public class ReleaseTriggerListener extends RunListener<Run<?,?>>{
     @Override
     @SuppressWarnings("deprecation") // TODO 2.30+ use removeAction
     public void onCompleted(Run<?,?> run, @Nonnull TaskListener listener) {
-        LOGGER.log(Level.INFO, "onCompleted");
-
         for (ReleaseTriggerAction.Trigger trigger : ReleaseTriggerAction.triggersFor(run)) {
             LOGGER.log(Level.FINE, "completing {0} for {1}", new Object[] {run, trigger.context});
             if (run.getResult() == Result.SUCCESS) {
@@ -66,8 +62,6 @@ public class ReleaseTriggerListener extends RunListener<Run<?,?>>{
 
     @Override
     public void onDeleted(Run<?,?> run) {
-        LOGGER.log(Level.INFO, "onDeleted");
-
         for (ReleaseTriggerAction.Trigger trigger : ReleaseTriggerAction.triggersFor(run)) {
             trigger.context.onFailure(new AbortException(run.getFullDisplayName() + " was deleted"));
         }

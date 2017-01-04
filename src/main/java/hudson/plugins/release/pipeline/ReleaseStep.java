@@ -19,7 +19,10 @@ import org.jenkinsci.plugins.workflow.steps.StepContext;
 import org.jenkinsci.plugins.workflow.steps.StepContextParameter;
 import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 import org.jenkinsci.plugins.workflow.steps.StepExecution;
+import org.jenkinsci.plugins.workflow.util.StaplerReferer;
 import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.DataBoundSetter;
+import org.kohsuke.stapler.StaplerRequest;
 
 import com.google.inject.Inject;
 
@@ -40,6 +43,7 @@ import hudson.model.ParameterValue;
 import hudson.model.ParametersAction;
 import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Run;
+import hudson.model.StringParameterValue;
 import hudson.model.TaskListener;
 import hudson.model.queue.QueueTaskFuture;
 import hudson.plugins.release.ReleaseWrapper;
@@ -47,6 +51,8 @@ import hudson.plugins.release.SafeParametersAction;
 import jenkins.YesNoMaybe;
 import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONObject;
 
 /**
  * Created by e3cmea on 1/3/17.
@@ -69,6 +75,12 @@ public class ReleaseStep extends AbstractStepImpl {
 
     public void setJob(String job) {
         this.job = job;
+    }
+
+    public List<ParameterValue> getParameters() {
+        List<ParameterValue> parameters = new ArrayList<>();
+        parameters.add(new StringParameterValue("releaseVersion", "123"));
+        return parameters;
     }
 
     public static class Execution extends AbstractStepExecutionImpl {
@@ -105,30 +117,19 @@ public class ReleaseStep extends AbstractStepImpl {
                 throw new AbortException("Job name is not defined.");
             }
 
-            final AbstractProject project = Jenkins.getActiveInstance().getItem(step.getJob(), invokingRun.getParent(), AbstractProject.class);
+            final AbstractProject project = Jenkins.getActiveInstance()
+                                                   .getItem(step.getJob(), invokingRun.getParent(), AbstractProject.class);
             if (project == null) {
                 throw new AbortException("No parametrized job named " + step.getJob() + " found");
             }
             listener.getLogger().println("Releasing project: " + ModelHyperlinkNote.encodeTo(project));
 
-
             List<Action> actions = new ArrayList<>();
-
             StepContext context = getContext();
             actions.add(new ReleaseTriggerAction(context));
-            LOGGER.log(Level.FINER, "scheduling a release of {0} from {1}", new Object[] {project, context});
-
-/*
-            List<ParameterValue> parameters = step.getParameters();
-            if (parameters != null) {
-                parameters = completeDefaultParameters(parameters, (Job) project);
-                actions.add(new ParametersAction(parameters));
-            }
-*/
-            actions.add(new SafeParametersAction(getDefaultParametersValues(project)));
-
+            LOGGER.log(Level.FINER, "scheduling a release of {0} from {1}", new Object[] { project, context });
+            actions.add(new SafeParametersAction(step.getParameters()));
             actions.add(new ReleaseWrapper.ReleaseBuildBadgeAction());
-
 
             QueueTaskFuture<?> task = project.scheduleBuild2(0, new Cause.UpstreamCause(invokingRun), actions);
             if (task == null) {
