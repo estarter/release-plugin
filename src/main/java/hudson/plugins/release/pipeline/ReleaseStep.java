@@ -86,7 +86,7 @@ public class ReleaseStep extends AbstractStepImpl {
         @Inject(optional=true) transient ReleaseStep step;
 
         private List<ParameterValue> updateParametersWithDefaults(AbstractProject project,
-                List<ParameterValue> parameters) {
+                List<ParameterValue> parameters) throws AbortException {
 
             if (project instanceof BuildableItemWithBuildWrappers) {
                 ReleaseWrapper wrapper = ((BuildableItemWithBuildWrappers) project).getBuildWrappersList()
@@ -95,7 +95,8 @@ public class ReleaseStep extends AbstractStepImpl {
                     for (ParameterDefinition pd : wrapper.getParameterDefinitions()) {
                         boolean parameterExists = false;
                         for (ParameterValue pv : parameters) {
-                            if (pv.getName().equals(pd.getName())) {
+                            if (pv.getName()
+                                  .equals(pd.getName())) {
                                 parameterExists = true;
                                 break;
                             }
@@ -104,6 +105,8 @@ public class ReleaseStep extends AbstractStepImpl {
                             parameters.add(pd.getDefaultParameterValue());
                         }
                     }
+                } else {
+                    throw new AbortException("Job doesn't have release plugin configuration");
                 }
             }
             return parameters;
