@@ -17,6 +17,7 @@ import hudson.model.queue.FoldableAction;
 
 /**
  * copied from org.jenkinsci.plugins.workflow.support.steps.build.BuildTriggerAction
+ * @since 2.7
  */
 @SuppressWarnings("SynchronizeOnNonFinalField")
 class ReleaseTriggerAction extends InvisibleAction implements FoldableAction {
@@ -29,7 +30,7 @@ class ReleaseTriggerAction extends InvisibleAction implements FoldableAction {
         final StepContext context;
 
 
-        /** Record of cancellation cause passed to {@link ReleaseStep#stop}, if any. */
+        /** Record of cancellation cause passed to {@link ReleaseStep$Execution#stop}, if any. */
         @CheckForNull Throwable interruption;
 
         Trigger(StepContext context) {

@@ -10,6 +10,7 @@ import hudson.model.queue.QueueListener;
 
 /**
  * copied from org.jenkinsci.plugins.workflow.support.steps.build.BuildQueueListener
+ * @since 2.7
  */
 @Extension
 @Restricted(NoExternalUse.class)

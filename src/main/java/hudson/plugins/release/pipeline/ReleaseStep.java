@@ -66,6 +66,13 @@ public class ReleaseStep extends AbstractStepImpl {
         parameters = new ArrayList<>();
     }
 
+    private Object readResolve() {
+        if (parameters == null) {
+            parameters = new ArrayList<>();
+        }
+        return this;
+    }
+
     public String getJob() {
         return job;
     }
