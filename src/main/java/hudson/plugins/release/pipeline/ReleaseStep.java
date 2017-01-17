@@ -79,8 +79,10 @@ public class ReleaseStep extends AbstractStepImpl {
     }
 
     @DataBoundSetter
-    public void setParameters(@Nonnull List<ParameterValue> parameters) {
-        if (parameters != null) {
+    public void setParameters(List<ParameterValue> parameters) {
+        if (parameters == null) {
+            this.parameters = new ArrayList<>();
+        } else {
             this.parameters = parameters;
         }
     }
