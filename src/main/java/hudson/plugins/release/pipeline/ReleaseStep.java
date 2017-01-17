@@ -1,14 +1,16 @@
 package hudson.plugins.release.pipeline;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import javax.annotation.Nonnull;
 
-import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
 import org.jenkinsci.plugins.workflow.steps.Step;
 import org.jenkinsci.plugins.workflow.steps.StepContext;
+import org.jenkinsci.plugins.workflow.steps.StepDescriptor;
 import org.jenkinsci.plugins.workflow.steps.StepExecution;
 import org.jenkinsci.plugins.workflow.util.StaplerReferer;
 import org.kohsuke.accmod.Restricted;
@@ -19,7 +21,10 @@ import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
+import com.google.common.collect.ImmutableSet;
+
 import hudson.Extension;
+import hudson.FilePath;
 import hudson.model.AutoCompletionCandidates;
 import hudson.model.BuildableItem;
 import hudson.model.BuildableItemWithBuildWrappers;
@@ -27,6 +32,8 @@ import hudson.model.ItemGroup;
 import hudson.model.Job;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParameterValue;
+import hudson.model.Run;
+import hudson.model.TaskListener;
 import hudson.plugins.release.ReleaseWrapper;
 import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
@@ -79,10 +86,7 @@ public class ReleaseStep extends Step {
     }
 
     @Extension
-    public static class DescriptorImpl extends AbstractStepDescriptorImpl {
-        public DescriptorImpl() {
-            super(ReleaseStepExecution.class);
-        }
+    public static class DescriptorImpl extends StepDescriptor {
 
         @Override
         public String getFunctionName() {
@@ -94,7 +98,13 @@ public class ReleaseStep extends Step {
             return "Trigger release for the job";
         }
 
-        @Override public Step newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+        @Override
+        public Set<Class<?>> getRequiredContext() {
+            return ImmutableSet.of(Run.class, TaskListener.class);
+        }
+
+        @Override
+        public Step newInstance(StaplerRequest req, JSONObject formData) throws FormException {
             ReleaseStep step = (ReleaseStep) super.newInstance(req, formData);
             // Cf. ParametersDefinitionProperty._doBuild:
             Object parameter = formData.get("parameter");
@@ -141,7 +151,7 @@ public class ReleaseStep extends Step {
             return AutoCompletionCandidates.ofJobNames(ParameterizedJobMixIn.ParameterizedJob.class, value, context);
         }
 
-        @Restricted(DoNotUse.class) // for use from config.jelly
+        @Restricted(DoNotUse.class) // for use from config.jelly / parameters.groovy
         public String getContext() {
             Job<?,?> job = StaplerReferer.findItemFromRequest(Job.class);
             return job != null ? job.getFullName() : null;
