@@ -78,7 +78,8 @@ public class ReleaseStepExecution extends StepExecution {
             throw new AbortException("Job name is not defined.");
         }
 
-        final ParameterizedJobMixIn.ParameterizedJob project = (ParameterizedJobMixIn.ParameterizedJob) Jenkins.getActiveInstance().getItem(step.getJob());;
+        final ParameterizedJobMixIn.ParameterizedJob project = Jenkins.getActiveInstance().
+                getItemByFullName(step.getJob(), ParameterizedJobMixIn.ParameterizedJob.class);;
         if (project == null) {
             throw new AbortException("No parametrized job named " + step.getJob() + " found");
         }
