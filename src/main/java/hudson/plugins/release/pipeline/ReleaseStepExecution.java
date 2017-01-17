@@ -31,9 +31,8 @@ import jenkins.model.Jenkins;
 import jenkins.model.ParameterizedJobMixIn;
 
 /**
- * Created by e3cmea on 1/17/17.
- *
  * @author Alexey Merezhin
+ * @since 2.7
  */
 public class ReleaseStepExecution extends StepExecution {
     private static final Logger LOGGER = Logger.getLogger(ReleaseStepExecution.class.getName());
@@ -55,8 +54,7 @@ public class ReleaseStepExecution extends StepExecution {
                 for (ParameterDefinition pd : wrapper.getParameterDefinitions()) {
                     boolean parameterExists = false;
                     for (ParameterValue pv : parameters) {
-                        if (pv.getName()
-                              .equals(pd.getName())) {
+                        if (pv.getName().equals(pd.getName())) {
                             parameterExists = true;
                             break;
                         }
@@ -103,9 +101,7 @@ public class ReleaseStepExecution extends StepExecution {
     }
 
     @Override
-    public void stop(
-            @Nonnull
-                    Throwable cause) throws Exception {
+    public void stop(@Nonnull Throwable cause) throws Exception {
         getContext().onFailure(cause);
     }
 

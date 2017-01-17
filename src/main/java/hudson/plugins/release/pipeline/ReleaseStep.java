@@ -7,7 +7,6 @@ import java.util.logging.Logger;
 import javax.annotation.Nonnull;
 
 import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
-import org.jenkinsci.plugins.workflow.steps.AbstractStepImpl;
 import org.jenkinsci.plugins.workflow.steps.Step;
 import org.jenkinsci.plugins.workflow.steps.StepContext;
 import org.jenkinsci.plugins.workflow.steps.StepExecution;
@@ -51,13 +50,6 @@ public class ReleaseStep extends Step {
     public ReleaseStep(String job) {
         this.job = job;
         parameters = new ArrayList<>();
-    }
-
-    private Object readResolve() {
-        if (parameters == null) {
-            parameters = new ArrayList<>();
-        }
-        return this;
     }
 
     public String getJob() {
