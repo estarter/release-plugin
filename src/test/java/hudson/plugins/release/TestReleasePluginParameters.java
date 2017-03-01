@@ -5,14 +5,17 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.jvnet.hudson.test.ToolInstallations.configureMaven3;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Arrays;
 import java.util.Scanner;
 
+import org.apache.maven.project.MavenProject;
 import org.junit.Rule;
 import org.junit.Test;
+import org.jvnet.hudson.test.ExtractResourceSCM;
 import org.jvnet.hudson.test.Issue;
 import org.jvnet.hudson.test.JenkinsRule;
 import org.jvnet.hudson.test.MockBuilder;
@@ -20,6 +23,8 @@ import org.jvnet.hudson.test.MockBuilder;
 import com.gargoylesoftware.htmlunit.html.HtmlForm;
 
 import hudson.Launcher;
+import hudson.maven.MavenModule;
+import hudson.maven.MavenModuleSet;
 import hudson.model.AbstractBuild;
 import hudson.model.BooleanParameterDefinition;
 import hudson.model.BuildListener;
@@ -30,6 +35,7 @@ import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Result;
 import hudson.model.StringParameterDefinition;
 import hudson.tasks.BuildStep;
+import hudson.tasks.Maven;
 import hudson.tasks.Shell;
 
 public class TestReleasePluginParameters {
@@ -62,7 +68,11 @@ public class TestReleasePluginParameters {
 
     @Test
     public void testReleaseMixedParameters() throws Exception {
-        FreeStyleProject proj = j.createProject(FreeStyleProject.class, "foo");
+        Maven.MavenInstallation mvn = configureMaven3();
+        MavenModuleSet proj = j.createProject(MavenModuleSet.class, "child_a");
+        proj.setRootPOM("child_a/pom.xml");
+        proj.setMaven(mvn.getName());
+        proj.setScm(new ExtractResourceSCM(getClass().getResource("child_a.zip")));
 
         ReleaseWrapper releaseWrapper = new ReleaseWrapper();
         releaseWrapper.setParameterDefinitions(Arrays.asList(new ParameterDefinition [] {
